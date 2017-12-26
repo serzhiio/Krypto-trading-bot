@@ -229,8 +229,8 @@ namespace K {
       void filter(mLevels k) {
         levels = k;
         if (levels.empty()) return;
-        for (map<string, mOrder>::iterator it = ((OG*)broker)->orders.begin(); it != ((OG*)broker)->orders.end(); ++it)
-          filter(mSide::Bid == it->second.side ? &levels.bids : &levels.asks, it->second);
+        for (map<string, mOrder>::value_type &it : ((OG*)broker)->orders)
+          filter(mSide::Bid == it.second.side ? &levels.bids : &levels.asks, it.second);
         if (levels.empty()) return;
         calcFairValue();
         ((EV*)events)->mgLevels();
@@ -290,8 +290,7 @@ namespace K {
         mgSMA3.push_back(fairValue);
         if (mgSMA3.size()>3) mgSMA3.erase(mgSMA3.begin(), mgSMA3.end()-3);
         double SMA3 = 0;
-        for (vector<double>::iterator it = mgSMA3.begin(); it != mgSMA3.end(); ++it)
-          SMA3 += *it;
+        for (double &it : mgSMA3) SMA3 += it;
         SMA3 /= mgSMA3.size();
         double newTargetPosition = 0;
         if (qp->autoPositionMode == mAutoPositionMode::EWMA_LMS) {
