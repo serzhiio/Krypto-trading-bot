@@ -10,17 +10,17 @@ namespace K {
       mQuoteStatus status;
       unsigned int AK47inc = 1;
     public:
-      mConnectivity gwConnectButton = mConnectivity::Disconnected,
+      mConnectivity gwConnectButton   = mConnectivity::Disconnected,
                     gwConnectExchange = mConnectivity::Disconnected;
     protected:
       void load() {
-        quotingMode[mQuotingMode::Top] = &calcTopOfMarket;
-        quotingMode[mQuotingMode::Mid] = &calcMidOfMarket;
-        quotingMode[mQuotingMode::Join] = &calcJoinMarket;
+        quotingMode[mQuotingMode::Top]         = &calcTopOfMarket;
+        quotingMode[mQuotingMode::Mid]         = &calcMidOfMarket;
+        quotingMode[mQuotingMode::Join]        = &calcJoinMarket;
         quotingMode[mQuotingMode::InverseJoin] = &calcInverseJoinMarket;
-        quotingMode[mQuotingMode::InverseTop] = &calcInverseTopOfMarket;
-        quotingMode[mQuotingMode::HamelinRat] = &calcColossusOfMarket;
-        quotingMode[mQuotingMode::Depth] = &calcDepthOfMarket;
+        quotingMode[mQuotingMode::InverseTop]  = &calcInverseTopOfMarket;
+        quotingMode[mQuotingMode::HamelinRat]  = &calcColossusOfMarket;
+        quotingMode[mQuotingMode::Depth]       = &calcDepthOfMarket;
       };
       void waitTime() {
         ((EV*)events)->tEngine->data = this;
@@ -45,8 +45,7 @@ namespace K {
         };
         ((EV*)events)->ogTrade = [&](mTrade k) {
           ((EV*)events)->debug("QE ogTrade");
-          ((PG*)wallet)->addTrade(k);
-          ((PG*)wallet)->calcSafety();
+          ((PG*)wallet)->calcSafetyAfterTrade(k);
           calcQuote();
         };
         ((EV*)events)->mgEwmaQuoteProtection = [&]() {
@@ -109,7 +108,7 @@ namespace K {
         bool k = diffCounts(&quotesInMemoryNew, &quotesInMemoryWorking, &quotesInMemoryDone);
         if (!diffStatus() and !k) return;
         status = mQuoteStatus(bidStatus, askStatus, quotesInMemoryNew, quotesInMemoryWorking, quotesInMemoryDone);
-        ((UI*)client)->send(mMatter::QuoteStatus, status, true);
+        ((UI*)client)->send(mMatter::QuoteStatus, status);
       };
       bool diffCounts(unsigned int *qNew, unsigned int *qWorking, unsigned int *qDone) {
         for (map<string, mOrder>::value_type &it : ((OG*)broker)->orders)
@@ -366,7 +365,8 @@ namespace K {
         rawQuote->bid.price = fmin(((MG*)market)->mgEwmaP, rawQuote->bid.price);
       };
       mQuote quote(double widthPing, double buySize, double sellSize) {
-        if (quotingMode.find(qp->mode) == quotingMode.end()) FN::logExit("QE", "Invalid quoting mode", EXIT_SUCCESS);
+        if (quotingMode.find(qp->mode) == quotingMode.end())
+          exit(((EV*)events)->error("QE", "Invalid quoting mode"));
         return (*quotingMode[qp->mode])(widthPing, buySize, sellSize);
       };
       mQuote quoteAtTopOfMarket() {
@@ -495,7 +495,7 @@ namespace K {
         unsigned long now = FN::T();
         for (map<string, mOrder>::value_type &it : ((OG*)broker)->orders)
           if (it.second.side != side) continue;
-          else if (it.second.price == q.price and it.second.quantity == q.size) return;
+          else if (it.second.price == q.price) return;
           else if (it.second.orderStatus == mStatus::New)
             if (now-10e+3>it.second.time) zombie.push_back(it.second.orderId);
             else if (qp->safety != mQuotingSafety::AK47 or ++n >= qp->bullets) return;

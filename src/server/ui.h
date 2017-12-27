@@ -82,7 +82,7 @@ namespace K {
               document += "Content-Type: audio/mpeg\r\n";
               url = path;
             }
-            if (url.length())
+            if (!url.empty())
               content << ifstream(FN::readlink("app/client").substr(48) + url).rdbuf();
             else if (stol(FN::int64Id()) % 21) {
               document = "HTTP/1.1 404 Not Found\r\n";
@@ -107,46 +107,59 @@ namespace K {
             json welcome;
             (*hello[message[1]])(&welcome);
             if (!welcome.is_null()) webSocket->send((string(message, 2) + welcome.dump()).data(), uWS::OpCode::TEXT);
-          } else if (mPortal::Kiss == (mPortal)message[0] and kisses.find(message[1]) != kisses.end())
-            (*kisses[message[1]])(json::parse((length > 2 and (message[2] == '[' or message[2] == '{'))
-              ? string(message, length).substr(2, length-2) : "{}"
-            ));
+          } else if (mPortal::Kiss == (mPortal)message[0] and kisses.find(message[1]) != kisses.end()) {
+            json butterfly = json::parse((length > 2 and message[2] == '{') ? string(message, length).substr(2, length-2) : "{}");
+            for (json::iterator it = butterfly.begin(); it != butterfly.end();)
+              if (it.value().is_null()) it = butterfly.erase(it); else ++it;
+            (*kisses[message[1]])(butterfly);
+          }
         });
       };
       void waitUser() {
-        welcome(mMatter::ApplicationState, &helloServer);
-        welcome(mMatter::ProductAdvertisement, &helloProduct);
-        welcome(mMatter::Notepad, &helloNotes);
-        clickme(mMatter::Notepad, &kissNotes);
-        welcome(mMatter::ToggleSettings, &helloSettings);
-        clickme(mMatter::ToggleSettings, &kissSettings);
+        if (((CF*)config)->argHeadless) {
+          welcome = [&](mMatter k, function<void(json*)> *fn) {};
+          clickme = [&](mMatter k, function<void(json)> *fn) {};
+          delayme = [&](unsigned int delayUI) {};
+          send = [&](mMatter k, json o) {};
+        } else {
+          welcome(mMatter::ApplicationState, &helloServer);
+          welcome(mMatter::ProductAdvertisement, &helloProduct);
+          welcome(mMatter::Notepad, &helloNotes);
+          clickme(mMatter::Notepad, &kissNotes);
+          welcome(mMatter::ToggleSettings, &helloSettings);
+          clickme(mMatter::ToggleSettings, &kissSettings);
+        }
       };
       void run() {
         if (((CF*)config)->argHeadless) return;
         ((EV*)events)->listen();
       };
     public:
-      void welcome(mMatter k, function<void(json*)> *fn) {
-        if (((CF*)config)->argHeadless) return;
-        if (hello.find((char)k) == hello.end())
-          hello[(char)k] = fn;
-        else FN::logExit("UI", string("Use only a single unique message handler for each \"") + (char)k + "\" event", EXIT_SUCCESS);
+      function<void(mMatter, function<void(json*)>*)> welcome = [&](mMatter k, function<void(json*)> *fn) {
+        if (hello.find((char)k) == hello.end()) hello[(char)k] = fn;
+        else exit(((EV*)events)->error("UI", string("Use only a single unique message handler for each \"") + (char)k + "\" welcome event"));
       };
-      void clickme(mMatter k, function<void(json)> *fn) {
-        if (((CF*)config)->argHeadless) return;
-        if (kisses.find((char)k) == kisses.end())
-          kisses[(char)k] = fn;
-        else FN::logExit("UI", string("Use only a single unique message handler for each \"") + (char)k + "\" event", EXIT_SUCCESS);
+      function<void(mMatter, function<void(json)>*)> clickme = [&](mMatter k, function<void(json)> *fn) {
+        if (kisses.find((char)k) == kisses.end()) kisses[(char)k] = fn;
+        else exit(((EV*)events)->error("UI", string("Use only a single unique message handler for each \"") + (char)k + "\" clickme event"));
       };
-      void delayme(unsigned int delayUI) {
-        if (((CF*)config)->argHeadless) return;
+      function<void(unsigned int)> delayme = [&](unsigned int delayUI) {
         realtimeClient = !delayUI;
         ((EV*)events)->tClient->stop();
         ((EV*)events)->tClient->start(sendState, 0, realtimeClient ? 6e+4 : delayUI*1e+3);
       };
-      void send(mMatter k, json o, bool delayed = false) {
-        if (((CF*)config)->argHeadless or connections == 0) return;
-        if (realtimeClient or !delayed) send(k, o.dump());
+      function<void(mMatter, json)> send = [&](mMatter k, json o) {
+        if (connections == 0) return;
+        bool delayed = (
+          k == mMatter::FairValue
+          or k == mMatter::OrderStatusReports
+          or k == mMatter::QuoteStatus
+          or k == mMatter::Position
+          or k == mMatter::TargetBasePosition
+          or k == mMatter::EWMAChart
+          or k == mMatter::MarketData
+        );
+        if (realtimeClient or !delayed) broadcast(k, o.dump());
         else queue[k] = o.dump();
       };
     private:
@@ -177,23 +190,23 @@ namespace K {
         if (butterfly.is_array() and butterfly.size())
           toggleSettings = butterfly.at(0);
       };
-      void send(mMatter k, string j) {
+      void broadcast(mMatter k, string j) {
         string m(1, (char)mPortal::Kiss);
         m += (char)k + j;
         ((EV*)events)->deferred([this, m]() {
           ((EV*)events)->uiGroup->broadcast(m.data(), m.length(), uWS::OpCode::TEXT);
         });
       };
-      void sendQueue() {
+      void broadcastQueue() {
         for (map<mMatter, string>::value_type &it : queue)
-          send(it.first, it.second);
+          broadcast(it.first, it.second);
         queue.clear();
       };
       void (*sendState)(Timer*) = [](Timer *handle) {
         UI *k = (UI*)handle->data;
         ((EV*)k->events)->debug("UI tClient timer");
         if (!k->realtimeClient) {
-          k->sendQueue();
+          k->broadcastQueue();
           if (k->uiT_1m+6e+4 > FN::T()) return;
           else k->uiT_1m = FN::T();
         }

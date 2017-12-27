@@ -4,7 +4,7 @@
 namespace K {
   class GW: public Klass {
     private:
-      mConnectivity gwAdminEnabled = mConnectivity::Disconnected,
+      mConnectivity gwAdminEnabled  = mConnectivity::Disconnected,
                     gwConnectOrders = mConnectivity::Disconnected,
                     gwConnectMarket = mConnectivity::Disconnected;
       unsigned int gwT_5m = 0;
@@ -44,10 +44,14 @@ namespace K {
       };
     private:
       function<void()> happyEnding = [&]() {
-        ((EV*)events)->stop([&](){
-          FN::log(string("GW ") + gw->name, "Attempting to cancel all open orders, please wait.");
-          gw->cancelAll();
-          FN::log(string("GW ") + gw->name, "cancell all open orders OK");
+        ((EV*)events)->stop([&]() {
+          if (((CF*)config)->argDustybot)
+            FN::log(string("GW ") + gw->name, "Dustybot is enabled, remember to cancel manually any open order.");
+          else {
+            FN::log(string("GW ") + gw->name, "Attempting to cancel all open orders, please wait.");
+            gw->cancelAll();
+            FN::log(string("GW ") + gw->name, "cancell all open orders OK");
+          }
         });
       };
       function<void(json*)> hello = [&](json *welcome) {
@@ -168,7 +172,7 @@ namespace K {
           gw->minSize = 0.01;
         }
         if (!gw->minTick or !gw->minSize)
-          return FN::logExit("CF", "Unable to fetch data from " + gw->name + " for symbol \"" + gw->symbol + "\", possible error message: " + reply.dump(), EXIT_FAILURE);
+          exit(((EV*)events)->error("CF", "Unable to fetch data from " + gw->name + " for symbol \"" + gw->symbol + "\", possible error message: " + reply.dump(), true));
         FN::log(string("GW ") + gw->name, "allows client IP");
         stringstream ss;
         ss << setprecision(8) << fixed << '\n'
