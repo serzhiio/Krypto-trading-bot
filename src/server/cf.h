@@ -155,7 +155,7 @@ namespace K {
               << FN::uiT() << RWHITE << "    --colors              - print highlighted output." << '\n'
               << FN::uiT() << RWHITE << "-k, --matryoshka=URL      - set Matryoshka link URL of the next UI." << '\n'
               << FN::uiT() << RWHITE << "-K, --title=WORD          - set WORD as UI title to identify different bots." << '\n'
-              << FN::uiT() << RWHITE << "    --free-version        - work with all market levels but slowdown with 1 XMR hash." << '\n'
+              << FN::uiT() << RWHITE << "    --free-version        - work with all market levels but slowdown with 21 XMR hash." << '\n'
               << FN::uiT() << RWHITE << "-v, --version             - show current build version and quit." << '\n'
               << RGREEN << "  more help: " << RYELLOW << "https://github.com/ctubio/Krypto-trading-bot/blob/master/MANUAL.md" << '\n'
               << BGREEN << "K" << RGREEN << " questions: " << RYELLOW << "irc://irc.domirc.net:6667/##tradingBot" << '\n'
@@ -172,7 +172,7 @@ namespace K {
           cout << '\n';
           exit(EXIT_SUCCESS);
         }
-        if (argExchange == "") {
+        if (argExchange.empty()) {
           cout << "ARG" << RRED << " Errrror:" << BRED << " Missing mandatory argument \"--exchange\", at least." << '\n';
           exit(EXIT_SUCCESS);
         }
@@ -189,7 +189,7 @@ namespace K {
           RBLUE[0]  = RPURPLE[0] = RCYAN[0]  = RWHITE[0]  =
           BBLACK[0] = BRED[0]    = BGREEN[0] = BYELLOW[0] =
           BBLUE[0]  = BPURPLE[0] = BCYAN[0]  = BWHITE[0]  = argColors;
-        if (argDatabase == "") {
+        if (argDatabase.empty()) {
           argDatabase = string("/data/db/K")
             + '.' + FN::S2u(argExchange)
             + '.' + base()

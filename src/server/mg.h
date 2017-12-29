@@ -73,12 +73,10 @@ namespace K {
         FN::log("DB", string("loaded ") + to_string(fairValue96h.size()) + " historical FairValues");
       };
       void waitData() {
-        gw->evDataTrade = [&](mTrade k) {
-          ((EV*)events)->debug("MG evDataTrade");
+        gw->evDataTrade = [&](mTrade k) { _debugEvent_
           tradeUp(k);
         };
-        gw->evDataLevels = [&](mLevels k) {
-          ((EV*)events)->debug("MG evDataLevels");
+        gw->evDataLevels = [&](mLevels k) { _debugEvent_
           levelUp(k);
         };
       };
