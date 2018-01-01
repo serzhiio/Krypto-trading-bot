@@ -23,30 +23,30 @@ namespace K {
         quotingMode[mQuotingMode::Depth]       = &calcDepthOfMarket;
       };
       void waitTime() {
-        ((EV*)events)->tEngine->data = this;
+        ((EV*)events)->tEngine->setData(this);
         ((EV*)events)->tEngine->start([](Timer *tEngine) {
-          ((QE*)tEngine->data)->timer_1s();
+          ((QE*)tEngine->getData())->timer_1s();
         }, 1e+3, 1e+3);
       };
       void waitData() {
-        ((EV*)events)->uiQuotingParameters = [&]() { _debugEvent_
+        ((EV*)events)->uiQuotingParameters = [&]() {                _debugEvent_
           ((MG*)market)->calcFairValue();
           ((PG*)wallet)->calcTargetBasePos();
           ((PG*)wallet)->calcSafety();
           ((MG*)market)->calcEwmaHistory();
           calcQuote();
         };
-        ((EV*)events)->ogTrade = [&](mTrade k) { _debugEvent_
+        ((EV*)events)->ogTrade = [&](mTrade k) {                    _debugEvent_
           ((PG*)wallet)->calcSafetyAfterTrade(k);
           calcQuote();
         };
-        ((EV*)events)->mgEwmaQuoteProtection = [&]() { _debugEvent_
+        ((EV*)events)->mgEwmaQuoteProtection = [&]() {              _debugEvent_
           calcQuote();
         };
-        ((EV*)events)->mgLevels = [&]() { _debugEvent_
+        ((EV*)events)->mgLevels = [&]() {                           _debugEvent_
           calcQuote();
         };
-        ((EV*)events)->pgTargetBasePosition = [&]() { _debugEvent_
+        ((EV*)events)->pgTargetBasePosition = [&]() {               _debugEvent_
           calcQuote();
         };
       };
@@ -62,7 +62,7 @@ namespace K {
       function<void(json*)> hello = [&](json *welcome) {
         *welcome = { status };
       };
-      void timer_1s() { _debugEvent_
+      void timer_1s() {                                             _debugEvent_
         if (((MG*)market)->fairValue) {
           ((MG*)market)->calcStats();
           ((PG*)wallet)->calcSafety();
@@ -174,7 +174,7 @@ namespace K {
         debuq("H", rawQuote); applyRoundPrice(&rawQuote);
         debuq("I", rawQuote); applyRoundSize(&rawQuote, rawBidSz, rawAskSz, totalQuotePosition, totalBasePosition);
         debuq("J", rawQuote); applyDepleted(&rawQuote, totalQuotePosition, totalBasePosition);
-        debuq("K", rawQuote); applyWaitingPing(&rawQuote, totalQuotePosition, totalBasePosition, safetyBuyPing, safetysellPing);
+        debuq("K", rawQuote); applyWaitingPing(&rawQuote, safetyBuyPing, safetysellPing);
         debuq("!", rawQuote);
         rawQuote.isAskPong = (safetyBuyPing and rawQuote.ask.price and rawQuote.ask.price >= safetyBuyPing + widthPong);
         rawQuote.isBidPong = (safetysellPing and rawQuote.bid.price and rawQuote.bid.price <= safetysellPing - widthPong);
@@ -205,7 +205,7 @@ namespace K {
           rawQuote->bid.size = floor(fmax(gw->minSize, rawQuote->bid.size) / 1e-8) * 1e-8;
         }
       };
-      void applyWaitingPing(mQuote *rawQuote, double totalQuotePosition, double totalBasePosition, double safetyBuyPing, double safetysellPing) {
+      void applyWaitingPing(mQuote *rawQuote, double safetyBuyPing, double safetysellPing) {
         if (!qp->_matchPings and qp->safety != mQuotingSafety::PingPong) return;
         if (!safetyBuyPing and (
           (bidStatus != mQuoteState::DepletedFunds and (qp->pingAt == mPingAt::DepletedSide or qp->pingAt == mPingAt::DepletedBidSide))
@@ -442,8 +442,8 @@ namespace K {
             k.ask.size = it.size;
             k.ask.price = it.price;
           }
-        if (k.bid.size) k.bid.price + gw->minTick;
-        if (k.ask.size) k.ask.price - gw->minTick;
+        if (k.bid.size) k.bid.price += gw->minTick;
+        if (k.ask.size) k.ask.price -= gw->minTick;
         k.bid.size = buySize;
         k.ask.size = sellSize;
         return k;
@@ -488,7 +488,7 @@ namespace K {
         if (((OG*)broker)->orders.empty()) return start(side, q, isPong);
         unsigned int n = 0;
         vector<string> zombie;
-        unsigned long now = FN::T();
+        unsigned long now = _Tstamp_;
         for (map<string, mOrder>::value_type &it : ((OG*)broker)->orders)
           if (it.second.side != side) continue;
           else if (abs(it.second.price - q.price) < gw->minTick) return;

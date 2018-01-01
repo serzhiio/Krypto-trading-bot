@@ -9,12 +9,15 @@
 #define K_STAMP "0"
 #endif
 
+#define _Tstamp_ chrono::duration_cast<chrono::milliseconds>(     \
+                   chrono::system_clock::now().time_since_epoch() \
+                 ).count()
+
 namespace K {
   class FN {
     public:
       static string S2l(string k) { transform(k.begin(), k.end(), k.begin(), ::tolower); return k; };
       static string S2u(string k) { transform(k.begin(), k.end(), k.begin(), ::toupper); return k; };
-      static unsigned long T() { return chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now().time_since_epoch()).count(); };
       static string uiT() {
         chrono::time_point<chrono::system_clock> now = chrono::system_clock::now();
         auto t = now.time_since_epoch();
@@ -148,6 +151,7 @@ namespace K {
         CURL* curl;
         curl = curl_easy_init();
         if (curl) {
+          curl_easy_setopt(curl, CURLOPT_CAINFO, "etc/K-cabundle.pem");
           curl_easy_setopt(curl, CURLOPT_URL, k.data());
           curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, &wcb);
           curl_easy_setopt(curl, CURLOPT_WRITEDATA, &k_);
@@ -155,7 +159,7 @@ namespace K {
           if (f) curl_easy_setopt(curl, CURLOPT_TIMEOUT, 4L);
           else curl_easy_setopt(curl, CURLOPT_TIMEOUT, 13L);
           CURLcode r = curl_easy_perform(curl);
-          if(!f and r != CURLE_OK) FN::logWar("CURL", string("wGet failed ") + curl_easy_strerror(r));
+          if (!f and r != CURLE_OK) FN::logWar("CURL", string("wGet failed ") + curl_easy_strerror(r));
           curl_easy_cleanup(curl);
         }
         if (k_.empty() or (k_[0]!='{' and k_[0]!='[')) k_ = "{}";
@@ -170,6 +174,7 @@ namespace K {
         curl = curl_easy_init();
         if (curl) {
           struct curl_slist *h_ = NULL;
+          curl_easy_setopt(curl, CURLOPT_CAINFO, "etc/K-cabundle.pem");
           curl_easy_setopt(curl, CURLOPT_URL, k.data());
           curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, &wcb);
           curl_easy_setopt(curl, CURLOPT_POSTFIELDS, p.data());
@@ -193,6 +198,7 @@ namespace K {
         curl = curl_easy_init();
         if (curl) {
           struct curl_slist *h_ = NULL;
+          curl_easy_setopt(curl, CURLOPT_CAINFO, "etc/K-cabundle.pem");
           curl_easy_setopt(curl, CURLOPT_URL, k.data());
           curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, &wcb);
           if (!t.empty()) h_ = curl_slist_append(h_, string("Authorization: Bearer ").append(t).data());
@@ -215,6 +221,7 @@ namespace K {
         curl = curl_easy_init();
         if (curl) {
           struct curl_slist *h_ = NULL;
+          curl_easy_setopt(curl, CURLOPT_CAINFO, "etc/K-cabundle.pem");
           curl_easy_setopt(curl, CURLOPT_URL, k.data());
           curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, &wcb);
           curl_easy_setopt(curl, CURLOPT_POSTFIELDS, n.data());
@@ -238,6 +245,7 @@ namespace K {
         CURL* curl;
         curl = curl_easy_init();
         if (curl) {
+          curl_easy_setopt(curl, CURLOPT_CAINFO, "etc/K-cabundle.pem");
           curl_easy_setopt(curl, CURLOPT_URL, k.data());
           if (a) curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "DELETE");
           curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, &wcb);
@@ -260,6 +268,7 @@ namespace K {
         curl = curl_easy_init();
         if (curl) {
           struct curl_slist *h_ = NULL;
+          curl_easy_setopt(curl, CURLOPT_CAINFO, "etc/K-cabundle.pem");
           curl_easy_setopt(curl, CURLOPT_URL, k.data());
           curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, &wcb);
           curl_easy_setopt(curl, CURLOPT_POSTFIELDS, p.data());
@@ -283,6 +292,7 @@ namespace K {
         curl = curl_easy_init();
         if (curl) {
           struct curl_slist *h_ = NULL;
+          curl_easy_setopt(curl, CURLOPT_CAINFO, "etc/K-cabundle.pem");
           curl_easy_setopt(curl, CURLOPT_URL, k.data());
           curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, &wcb);
           curl_easy_setopt(curl, CURLOPT_POSTFIELDS, p.data());
@@ -308,6 +318,7 @@ namespace K {
         curl = curl_easy_init();
         if (curl) {
           struct curl_slist *h_ = NULL;
+          curl_easy_setopt(curl, CURLOPT_CAINFO, "etc/K-cabundle.pem");
           curl_easy_setopt(curl, CURLOPT_URL, k.data());
           curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, &wcb);
           curl_easy_setopt(curl, CURLOPT_POSTFIELDS, p.data());
@@ -333,6 +344,7 @@ namespace K {
         curl = curl_easy_init();
         if (curl) {
           struct curl_slist *h_ = NULL;
+          curl_easy_setopt(curl, CURLOPT_CAINFO, "etc/K-cabundle.pem");
           curl_easy_setopt(curl, CURLOPT_URL, k.data());
           curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, &wcb);
           curl_easy_setopt(curl, CURLOPT_POSTFIELDS, p.data());
@@ -357,6 +369,7 @@ namespace K {
         curl = curl_easy_init();
         if (curl) {
           struct curl_slist *h_ = NULL;
+          curl_easy_setopt(curl, CURLOPT_CAINFO, "etc/K-cabundle.pem");
           curl_easy_setopt(curl, CURLOPT_URL, k.data());
           curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, &wcb);
           h_ = curl_slist_append(h_, string("CB-ACCESS-KEY: ").append(a).data());
@@ -382,6 +395,7 @@ namespace K {
         curl = curl_easy_init();
         if (curl) {
           struct curl_slist *h_ = NULL;
+          curl_easy_setopt(curl, CURLOPT_CAINFO, "etc/K-cabundle.pem");
           curl_easy_setopt(curl, CURLOPT_URL, k.data());
           curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, &wcb);
           h_ = curl_slist_append(h_, string("CB-ACCESS-KEY: ").append(a).data());
@@ -403,25 +417,10 @@ namespace K {
         ((string*)up)->append((char*)buf, size * nmemb);
         return size * nmemb;
       };
-      static int procSelfStatus(char* line){
-        int i = strlen(line);
-        const char* p = line;
-        while (*p <'0' || *p > '9') p++;
-        line[i-3] = '\0';
-        i = atoi(p);
-        return i;
-      };
       static int memory() {
-        FILE* file = fopen("/proc/self/status", "r");
-        int result = -1;
-        char line[128];
-        while (fgets(line, 128, file) != NULL)
-          if (strncmp(line, "VmRSS:", 6) == 0) {
-            result = procSelfStatus(line);
-            break;
-          }
-        fclose(file);
-        return result * 1e+3;
+        string ps = output(string("ps -p") + to_string(::getpid()) + " -o rss | tail -n 1 | sed 's/ //'");
+        if (ps.empty()) ps = "0";
+        return stoi(ps) * 1e+3;
       };
       static string output(string cmd) {
         string data;
@@ -442,7 +441,7 @@ namespace K {
         ssize_t len;
         while((len = ::readlink(pathname, &buffer[0], buffer.size())) == static_cast<ssize_t>(buffer.size()))
           buffer.resize(buffer.size() * 2);
-        if (len == -1) FN::logWar("FN", "readlink failed");
+        if (len == -1) logWar("FN", "readlink failed");
         buffer.resize(len);
         return buffer;
       };

@@ -15,9 +15,9 @@ namespace K {
         handshake(gw->exchange);
       };
       void waitTime() {
-        ((EV*)events)->tServer->data = this;
+        ((EV*)events)->tServer->setData(this);
         ((EV*)events)->tServer->start([](Timer *tServer) {
-          ((GW*)tServer->data)->timer_15s();
+          ((GW*)tServer->getData())->timer_15s();
         }, 0, 15e+3);
       };
       void waitData() {
@@ -82,7 +82,7 @@ namespace K {
           {"status", ((QE*)engine)->gwConnectExchange}
         };
       };
-      void timer_15s() { _debugEvent_
+      void timer_15s() {                                            _debugEvent_
         gw->wallet();
         if (qp->cancelOrdersAuto)
           if (!gwT_5m++) gw->cancelAll();
@@ -142,8 +142,8 @@ namespace K {
                 gw->symbol = it.key();
                 gw->base = it.value().value("base", gw->base);
                 gw->quote = it.value().value("quote", gw->quote);
+                break;
               }
-              break;
             }
           gw->minSize = 0.01;
         }
@@ -174,7 +174,8 @@ namespace K {
         }
         if (!gw->minTick or !gw->minSize)
           exit(_errorEvent_("CF", "Unable to fetch data from " + gw->name + " for symbol \"" + gw->symbol + "\", possible error message: " + reply.dump(), true));
-        FN::log(string("GW ") + gw->name, "allows client IP");
+        if (k != mExchange::Null)
+          FN::log(string("GW ") + gw->name, "allows client IP");
         stringstream ss;
         ss << setprecision(gw->minTick < 1e-8 ? 10 : 8) << fixed << '\n'
           << "- autoBot: " << (!gwAdminEnabled ? "no" : "yes") << '\n'

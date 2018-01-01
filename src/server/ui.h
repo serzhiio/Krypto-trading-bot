@@ -27,7 +27,7 @@ namespace K {
       };
       void waitTime() {
         if (((CF*)config)->argHeadless) return;
-        ((EV*)events)->tClient->data = this;
+        ((EV*)events)->tClient->setData(this);
         ((EV*)events)->tClient->start(timer, 0, 0);
       };
       void waitData() {
@@ -104,9 +104,9 @@ namespace K {
               return;
           }
           if (mPortal::Hello == (mPortal)message[0] and hello.find(message[1]) != hello.end()) {
-            json welcome;
-            (*hello[message[1]])(&welcome);
-            if (!welcome.is_null()) webSocket->send((string(message, 2) + welcome.dump()).data(), uWS::OpCode::TEXT);
+            json reply;
+            (*hello[message[1]])(&reply);
+            if (!reply.is_null()) webSocket->send((string(message, 2) + reply.dump()).data(), uWS::OpCode::TEXT);
           } else if (mPortal::Kiss == (mPortal)message[0] and kisses.find(message[1]) != kisses.end()) {
             json butterfly = json::parse((length > 2 and message[2] == '{') ? string(message, length).substr(2, length-2) : "{}");
             for (json::iterator it = butterfly.begin(); it != butterfly.end();)
@@ -203,13 +203,13 @@ namespace K {
         queue.clear();
       };
       void (*timer)(Timer*) = [](Timer *tClient) {
-        ((UI*)tClient->data)->timer_60s_or_Xs();
+        ((UI*)tClient->getData())->timer_60s_or_Xs();
       };
-      void timer_60s_or_Xs() { _debugEvent_
+      void timer_60s_or_Xs() {                                      _debugEvent_
         if (!realtimeClient) {
           broadcastQueue();
-          if (uiT_60s + 6e+4 > FN::T()) return;
-          else uiT_60s = FN::T();
+          if (uiT_60s + 6e+4 > _Tstamp_) return;
+          else uiT_60s = _Tstamp_;
         }
         send(mMatter::ApplicationState, serverState());
         orders_60s = 0;
