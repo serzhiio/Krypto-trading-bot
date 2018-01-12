@@ -45,21 +45,28 @@ namespace K {
         wprintw(wLog, " ");
         return "";
       };
-      static string int64Id() {
+      static unsigned long long int64() {
         static random_device rd;
         static mt19937_64 gen(rd());
-        uniform_int_distribution<unsigned long long> dis;
-        return to_string(dis(gen)).substr(0,8);
+        return uniform_int_distribution<unsigned long long>()(gen);
+      };
+      static string int64Id() {
+        return to_string(int64()).substr(0,8);
       };
       static string charId() {
         char s[16];
-        for (unsigned int i = 0; i < 16; ++i) s[i] = alphanum[stol(int64Id()) % (sizeof(alphanum) - 1)];
+        for (unsigned int i = 0; i < 16; ++i) s[i] = alphanum[int64() % (sizeof(alphanum) - 1)];
         return string(s, 16);
       };
+      static string uuidId32() {
+        string uuid = uuidId();
+        uuid.erase(remove(uuid.begin(), uuid.end(), '-'), uuid.end());
+        return uuid;
+      }
       static string uuidId() {
         string uuid = string(36,' ');
-        unsigned long rnd = stol(int64Id());
-        unsigned long rnd_ = stol(int64Id());
+        unsigned long long rnd = int64();
+        unsigned long long rnd_ = int64();
         uuid[8] = '-';
         uuid[13] = '-';
         uuid[18] = '-';
@@ -72,6 +79,25 @@ namespace K {
             uuid[i] = alphanum[(i == 19) ? ((rnd & 0xf) & 0x3) | 0x8 : rnd & 0xf];
           }
         return S2l(uuid);
+      };
+      static string oZip(string k) {
+        z_stream zs;
+        if (inflateInit2(&zs, -15) != Z_OK) return "";
+        zs.next_in = (Bytef*)k.data();
+        zs.avail_in = k.size();
+        int ret;
+        char outbuffer[32768];
+        string k_;
+        do {
+          zs.avail_out = 32768;
+          zs.next_out = (Bytef*)outbuffer;
+          ret = inflate(&zs, Z_SYNC_FLUSH);
+          if (k_.size() < zs.total_out)
+            k_.append(outbuffer, zs.total_out - k_.size());
+        } while (ret == Z_OK);
+        inflateEnd(&zs);
+        if (ret != Z_STREAM_END) return "";
+        return k_;
       };
       static string oHex(string k) {
        unsigned int len = k.length();
@@ -155,7 +181,35 @@ namespace K {
         system("test -n \"`/bin/pidof stunnel`\" && kill -9 `/bin/pidof stunnel`");
         system("stunnel etc/K-stunnel.conf");
       };
-      static json wJet(string k, bool f = false) {
+      static int memory() {
+        string ps = output(string("ps -p") + to_string(::getpid()) + " -o rss | tail -n 1 | sed 's/ //'");
+        if (ps.empty()) ps = "0";
+        return stoi(ps) * 1e+3;
+      };
+      static string output(string cmd) {
+        string data;
+        FILE * stream;
+        const int max_buffer = 256;
+        char buffer[max_buffer];
+        cmd.append(" 2>&1");
+        stream = popen(cmd.c_str(), "r");
+        if (stream) {
+          while (!feof(stream))
+            if (fgets(buffer, max_buffer, stream) != NULL) data.append(buffer);
+          pclose(stream);
+        }
+        return data;
+      };
+      static string readlink(const char* pathname) {
+        string buffer(64, '\0');
+        ssize_t len;
+        while((len = ::readlink(pathname, &buffer[0], buffer.size())) == static_cast<ssize_t>(buffer.size()))
+          buffer.resize(buffer.size() * 2);
+        if (len == -1) logWar("FN", "readlink failed");
+        buffer.resize(len);
+        return buffer;
+      };
+      static json   wJet(string k, bool f = false) {
         return json::parse(wGet(k, f));
       };
       static string wGet(string k, bool f) {
@@ -177,7 +231,7 @@ namespace K {
         if (k_.empty() or (k_[0]!='{' and k_[0]!='[')) k_ = "{}";
         return k_;
       };
-      static json wJet(string k, string p) {
+      static json   wJet(string k, string p) {
         return json::parse(wGet(k, p));
       };
       static string wGet(string k, string p) {
@@ -201,7 +255,7 @@ namespace K {
         if (k_.empty() or (k_[0]!='{' and k_[0]!='[')) k_ = "{}";
         return k_;
       };
-      static json wJet(string k, string t, bool auth) {
+      static json   wJet(string k, string t, bool auth) {
         return json::parse(wGet(k, t, auth));
       };
       static string wGet(string k, string t, bool auth) {
@@ -224,7 +278,7 @@ namespace K {
         if (k_.empty() or (k_[0]!='{' and k_[0]!='[')) k_ = "{}";
         return k_;
       };
-      static json wJet(string k, bool p, string a, string s, string n) {
+      static json   wJet(string k, bool p, string a, string s, string n) {
         return json::parse(wGet(k, p, a, s, n));
       };
       static string wGet(string k, bool p, string a, string s, string n) {
@@ -249,17 +303,20 @@ namespace K {
         if (k_.empty() or (k_[0]!='{' and k_[0]!='[')) k_ = "{}";
         return k_;
       };
-      static json wJet(string k, bool a, string p) {
-        return json::parse(wGet(k, a, p));
+      static json   wJet(string k, bool a, string p, string s) {
+        return json::parse(wGet(k, a, p, s));
       };
-      static string wGet(string k, bool a, string p) {
+      static string wGet(string k, bool a, string p, string s) {
         string k_;
         CURL* curl;
         curl = curl_easy_init();
         if (curl) {
           curl_easy_setopt(curl, CURLOPT_CAINFO, "etc/K-cabundle.pem");
           curl_easy_setopt(curl, CURLOPT_URL, k.data());
-          if (a) curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "DELETE");
+          if (a) {
+            curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "DELETE");
+            curl_easy_setopt(curl, CURLOPT_POSTFIELDS, s.data());
+          }
           curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, &wcb);
           curl_easy_setopt(curl, CURLOPT_USERPWD, p.data());
           curl_easy_setopt(curl, CURLOPT_WRITEDATA, &k_);
@@ -271,7 +328,7 @@ namespace K {
         if (k_.empty() or (k_[0]!='{' and k_[0]!='[')) k_ = "{}";
         return k_;
       };
-      static json wJet(string k, string p, string s, bool post) {
+      static json   wJet(string k, string p, string s, bool post) {
         return json::parse(wGet(k, p, s, post));
       };
       static string wGet(string k, string p, string s, bool post) {
@@ -295,7 +352,7 @@ namespace K {
         if (k_.empty() or (k_[0]!='{' and k_[0]!='[')) k_ = "{}";
         return k_;
       };
-      static json wJet(string k, string p, string a, string s) {
+      static json   wJet(string k, string p, string a, string s) {
         return json::parse(wGet(k, p, a, s));
       };
       static string wGet(string k, string p, string a, string s) {
@@ -321,7 +378,7 @@ namespace K {
         if (k_.empty() or (k_[0]!='{' and k_[0]!='[')) k_ = "{}";
         return k_;
       };
-      static json wJet(string k, string p, string a, string s, bool post) {
+      static json   wJet(string k, string p, string a, string s, bool post) {
         return json::parse(wGet(k, p, a, s, post));
       };
       static string wGet(string k, string p, string a, string s, bool post) {
@@ -347,10 +404,10 @@ namespace K {
         if (k_.empty() or (k_[0]!='{' and k_[0]!='[')) k_ = "{}";
         return k_;
       };
-      static json wJet(string k, string p, string a, string s, bool post, bool auth) {
+      static json   wJet(string k, string p, string a, string s, bool post, bool auth) {
         return json::parse(wGet(k, p, a, s, post, auth));
       };
-      static string wGet(string k, string p, string t, string s, bool post, bool auth) {
+      static string wGet(string k, string p, string a, string s, bool post, bool auth) {
         string k_;
         CURL* curl;
         curl = curl_easy_init();
@@ -361,7 +418,7 @@ namespace K {
           curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, &wcb);
           curl_easy_setopt(curl, CURLOPT_POSTFIELDS, p.data());
           h_ = curl_slist_append(h_, "Content-Type: application/x-www-form-urlencoded");
-          if (!t.empty()) h_ = curl_slist_append(h_, string("Authorization: Bearer ").append(t).data());
+          if (!a.empty()) h_ = curl_slist_append(h_, string("Authorization: Bearer ").append(a).data());
           curl_easy_setopt(curl, CURLOPT_HTTPHEADER, h_);
           curl_easy_setopt(curl, CURLOPT_WRITEDATA, &k_);
           curl_easy_setopt(curl, CURLOPT_USERAGENT, "K");
@@ -372,7 +429,7 @@ namespace K {
         if (k_.empty() or (k_[0]!='{' and k_[0]!='[')) k_ = "{}";
         return k_;
       };
-      static json wJet(string k, string t, string a, string s, string p) {
+      static json   wJet(string k, string t, string a, string s, string p) {
         return json::parse(wGet(k, t, a, s, p));
       };
       static string wGet(string k, string t, string a, string s, string p) {
@@ -398,7 +455,7 @@ namespace K {
         if (k_.empty() or (k_[0]!='{' and k_[0]!='[')) k_ = "{}";
         return k_;
       };
-      static json wJet(string k, string t, string a, string s, string p, bool d) {
+      static json   wJet(string k, string t, string a, string s, string p, bool d) {
         return json::parse(wGet(k, t, a, s, p, d));
       };
       static string wGet(string k, string t, string a, string s, string p, bool d) {
@@ -428,34 +485,6 @@ namespace K {
       static size_t wcb(void *buf, size_t size, size_t nmemb, void *up) {
         ((string*)up)->append((char*)buf, size * nmemb);
         return size * nmemb;
-      };
-      static int memory() {
-        string ps = output(string("ps -p") + to_string(::getpid()) + " -o rss | tail -n 1 | sed 's/ //'");
-        if (ps.empty()) ps = "0";
-        return stoi(ps) * 1e+3;
-      };
-      static string output(string cmd) {
-        string data;
-        FILE * stream;
-        const int max_buffer = 256;
-        char buffer[max_buffer];
-        cmd.append(" 2>&1");
-        stream = popen(cmd.c_str(), "r");
-        if (stream) {
-          while (!feof(stream))
-            if (fgets(buffer, max_buffer, stream) != NULL) data.append(buffer);
-          pclose(stream);
-        }
-        return data;
-      };
-      static string readlink(const char* pathname) {
-        string buffer(64, '\0');
-        ssize_t len;
-        while((len = ::readlink(pathname, &buffer[0], buffer.size())) == static_cast<ssize_t>(buffer.size()))
-          buffer.resize(buffer.size() * 2);
-        if (len == -1) logWar("FN", "readlink failed");
-        buffer.resize(len);
-        return buffer;
       };
       static void logWar(string k, string s) {
         logErr(k, s, " Warrrrning: ");
@@ -671,7 +700,7 @@ namespace K {
         endwin();
         wBorder = nullptr;
       };
-      static int screen_events() {
+      static int  screen_events() {
         return wBorder
           ? wgetch(wBorder)
           : 'q';
