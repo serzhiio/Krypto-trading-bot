@@ -2,6 +2,7 @@
 #define K_EV_H_
 
 #define _errorEvent_ ((EV*)events)->error
+
 #define _debugEvent_ ((EV*)events)->debug(__PRETTY_FUNCTION__);
 
 namespace K  {
@@ -19,9 +20,7 @@ namespace K  {
       function<void(mOrder*)> ogOrder;
       function<void(mTrade*)> ogTrade;
       function<void()>        mgLevels,
-                              mgEwmaQuoteProtection,
                               mgTargetPosition,
-                              pgTargetBasePosition,
                               uiQuotingParameters;
     protected:
       void load() {

@@ -61,6 +61,9 @@ namespace K {
       static string int45Id() {
         return to_string(int64()).substr(0,10);
       };
+      static string int32Id() {
+        return to_string(int64()).substr(0,8);
+      };
       static string char16Id() {
         char s[16];
         for (unsigned int i = 0; i < 16; ++i) s[i] = _AZnums_[int64() % (sizeof(_AZnums_) - 1)];
@@ -750,7 +753,7 @@ namespace K {
         for (map<double, mOrder, greater<double>>::value_type &it : openOrders) {
           wattron(wBorder, COLOR_PAIR(it.second.side == mSide::Bid ? COLOR_CYAN : COLOR_MAGENTA));
           stringstream ss;
-          ss << setprecision(8) << fixed << (it.second.side == mSide::Bid ? "BID" : "ASK") << " > " << it.second.orderId << ": " << it.second.quantity << " " << it.second.pair.base << " at price " << it.second.price << " " << it.second.pair.quote;
+          ss << setprecision(8) << fixed << (it.second.side == mSide::Bid ? "BID" : "ASK") << " > " << it.second.exchangeId << ": " << it.second.quantity << " " << it.second.pair.base << " at price " << it.second.price << " " << it.second.pair.quote;
           mvwaddstr(wBorder, ++P, 1, ss.str().data());
           wattroff(wBorder, COLOR_PAIR(it.second.side == mSide::Bid ? COLOR_CYAN : COLOR_MAGENTA));
         }
