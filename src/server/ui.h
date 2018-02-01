@@ -20,25 +20,18 @@ namespace K {
     protected:
       void load() {
         if (((CF*)config)->argHeadless
-          or ((CF*)config)->argUser == "NULL"
           or ((CF*)config)->argUser.empty()
-          or ((CF*)config)->argPass == "NULL"
           or ((CF*)config)->argPass.empty()
         ) return;
         B64auth = string("Basic ") + FN::oB64(((CF*)config)->argUser + ':' + ((CF*)config)->argPass);
       };
-      void waitTime() {
-        if (((CF*)config)->argHeadless) return;
-        ((EV*)events)->tClient->setData(this);
-        ((EV*)events)->tClient->start(timer, 0, 0);
-      };
       void waitData() {
         if (((CF*)config)->argHeadless) return;
         ((EV*)events)->uiGroup->onConnection([&](uWS::WebSocket<uWS::SERVER> *webSocket, uWS::HttpRequest req) {
-          FN::logUIsess(++connections, webSocket->getAddress().address);
+          ((SH*)screen)->logUIsess(++connections, webSocket->getAddress().address);
         });
         ((EV*)events)->uiGroup->onDisconnection([&](uWS::WebSocket<uWS::SERVER> *webSocket, int code, char *message, size_t length) {
-          FN::logUIsess(--connections, webSocket->getAddress().address);
+          ((SH*)screen)->logUIsess(--connections, webSocket->getAddress().address);
         });
         ((EV*)events)->uiGroup->onHttpRequest([&](uWS::HttpResponse *res, uWS::HttpRequest req, char *data, size_t length, size_t remainingBytes) {
           string document;
@@ -47,17 +40,17 @@ namespace K {
           string addr = res->getHttpSocket()->getAddress().address;
           if (addr.length() > 7 and addr.substr(0, 7) == "::ffff:") addr = addr.substr(7);
           if (!((CF*)config)->argWhitelist.empty() and ((CF*)config)->argWhitelist.find(addr) == string::npos) {
-            FN::log("UI", "dropping gzip bomb on", addr);
+            ((SH*)screen)->log("UI", "dropping gzip bomb on", addr);
             content << ifstream("etc/K-bomb.gzip").rdbuf();
             document = "HTTP/1.1 200 OK\r\nConnection: keep-alive\r\nAccept-Ranges: bytes\r\nVary: Accept-Encoding\r\nCache-Control: public, max-age=0\r\n";
             document += "Content-Encoding: gzip\r\nContent-Length: " + to_string(content.str().length()) + "\r\n\r\n" + content.str();
             res->write(document.data(), document.length());
           } else if (!B64auth.empty() and auth.empty()) {
-            FN::log("UI", "authorization attempt from", addr);
+            ((SH*)screen)->log("UI", "authorization attempt from", addr);
             document = "HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: Basic realm=\"Basic Authorization\"\r\nConnection: keep-alive\r\nAccept-Ranges: bytes\r\nVary: Accept-Encoding\r\nContent-Type:text/plain; charset=UTF-8\r\nContent-Length: 0\r\n\r\n";
             res->write(document.data(), document.length());
           } else if (!B64auth.empty() and auth != B64auth) {
-            FN::log("UI", "authorization failed from", addr);
+            ((SH*)screen)->log("UI", "authorization failed from", addr);
             document = "HTTP/1.1 403 Forbidden\r\nConnection: keep-alive\r\nAccept-Ranges: bytes\r\nVary: Accept-Encoding\r\nContent-Type:text/plain; charset=UTF-8\r\nContent-Length: 0\r\n\r\n";
             res->write(document.data(), document.length());
           } else if (req.getMethod() == uWS::HttpMethod::METHOD_GET) {
@@ -68,7 +61,7 @@ namespace K {
             while ((n = path.find("..", n)) != string::npos) path.replace(n, 2, "");
             const string leaf = path.substr(path.find_last_of('.')+1);
             if (leaf == "/") {
-              FN::log("UI", "authorization success from", addr);
+              ((SH*)screen)->log("UI", "authorization success from", addr);
               document += "Content-Type: text/html; charset=UTF-8\r\n";
               url = "/index.html";
             } else if (leaf == "js") {
@@ -117,6 +110,11 @@ namespace K {
           }
         });
       };
+      void waitTime() {
+        if (((CF*)config)->argHeadless) return;
+        ((EV*)events)->tClient->setData(this);
+        ((EV*)events)->tClient->start(timer, 0, 0);
+      };
       void waitUser() {
         if (((CF*)config)->argHeadless) {
           welcome = [&](mMatter type, function<void(json*)> *fn) {};
@@ -139,11 +137,11 @@ namespace K {
     public:
       function<void(mMatter, function<void(json*)>*)> welcome = [&](mMatter type, function<void(json*)> *fn) {
         if (hello.find((char)type) == hello.end()) hello[(char)type] = fn;
-        else exit(_errorEvent_("UI", string("Use only a single unique message handler for each \"") + (char)type + "\" welcome event"));
+        else exit(_errorEvent_("UI", string("Use only a single unique message handler for \"") + (char)type + "\" welcome event"));
       };
       function<void(mMatter, function<void(json)>*)> clickme = [&](mMatter type, function<void(json)> *fn) {
         if (kisses.find((char)type) == kisses.end()) kisses[(char)type] = fn;
-        else exit(_errorEvent_("UI", string("Use only a single unique message handler for each \"") + (char)type + "\" clickme event"));
+        else exit(_errorEvent_("UI", string("Use only a single unique message handler for \"") + (char)type + "\" clickme event"));
       };
       function<void(unsigned int)> delayme = [&](unsigned int delayUI) {
         realtimeClient = !delayUI;
@@ -222,6 +220,7 @@ namespace K {
           {"freq", orders_60s},
           {"bids", bid_levels},
           {"asks", ask_levels},
+          {"theme", ((CF*)config)->argIgnoreMoon + ((CF*)config)->argIgnoreSun},
           {"dbsize", ((DB*)memory)->size()},
           {"a", gw->A()}
         };

@@ -21,7 +21,7 @@ namespace K {
       void load() {
         for (json &it : ((DB*)memory)->load(mMatter::Position))
           profits.push_back(it);
-        FN::log("DB", string("loaded ") + to_string(profits.size()) + " historical Profits");
+        ((SH*)screen)->log("DB", string("loaded ") + to_string(profits.size()) + " historical Profits");
         json k = ((DB*)memory)->load(mMatter::TargetBasePosition);
         if (!k.empty()) {
           k = k.at(0);
@@ -31,7 +31,7 @@ namespace K {
         }
         stringstream ss;
         ss << setprecision(8) << fixed << targetBasePosition;
-        FN::log("DB", string("loaded TBP = ") + ss.str() + " " + gw->base);
+        ((SH*)screen)->log("DB", string("loaded TBP = ") + ss.str() + " " + gw->base);
       };
       void waitData() {
         gw->evDataWallet = [&](mWallet k) {                         _debugEvent_
@@ -39,7 +39,7 @@ namespace K {
         };
         ((EV*)events)->ogOrder = [&](mOrder *k) {                   _debugEvent_
           calcWalletAfterOrder(k);
-          FN::screen_refresh(((OG*)broker)->orders);
+          ((SH*)screen)->log(&((OG*)broker)->orders);
         };
         ((EV*)events)->ogTrade = [&](mTrade *k) {                   _debugEvent_
           calcSafetyAfterTrade(k);
@@ -77,7 +77,7 @@ namespace K {
         calcSafety();
       };
       void calcTargetBasePos() {
-        if (position.empty()) return FN::logWar("PG", "Unable to calculate TBP, missing wallet data");
+        if (position.empty()) return ((SH*)screen)->logWar("PG", "Unable to calculate TBP, missing wallet data");
         mAmount baseValue = position.baseValue;
         mAmount next = qp->autoPositionMode == mAutoPositionMode::Manual
           ? (qp->percentageValues
@@ -96,7 +96,7 @@ namespace K {
         ss << (int)(targetBasePosition / baseValue * 1e+2) << "% = " << setprecision(8) << fixed << targetBasePosition;
         stringstream ss_;
         ss_ << (int)(positionDivergence  / baseValue * 1e+2) << "% = " << setprecision(8) << fixed << positionDivergence;
-        FN::log("PG", string("TBP: ") + ss.str() + " " + gw->base + ", pDiv: " + ss_.str() + " " + gw->base);
+        ((SH*)screen)->log("PG", string("TBP: ") + ss.str() + " " + gw->base + ", pDiv: " + ss_.str() + " " + gw->base);
       };
     private:
       function<void(json*)> helloPosition = [&](json *welcome) {
@@ -276,7 +276,7 @@ namespace K {
         calcWallet(mWallet(amount, heldAmount, k->side == mSide::Ask ? k->pair.base : k->pair.quote));
         if (!k->tradeQuantity or walletT_2s + 2e+3 > _Tstamp_) return;
         walletT_2s = _Tstamp_;
-        gw->wallet();
+        ((EV*)events)->async(gw->wallet);
       };
       void calcPDiv(mAmount baseValue) {
         mAmount pDiv = qp->percentageValues

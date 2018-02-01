@@ -12,16 +12,16 @@ namespace K {
       void load() {
         if (sqlite3_open(((CF*)config)->argDatabase.data(), &db))
           exit(_errorEvent_("DB", sqlite3_errmsg(db)));
-        FN::logDB(((CF*)config)->argDatabase);
+        ((SH*)screen)->logDB(((CF*)config)->argDatabase);
         if (((CF*)config)->argDiskdata.empty()) return;
         qpdb = "qpdb";
         char* zErrMsg = 0;
         sqlite3_exec(db, (
           string("ATTACH '") + ((CF*)config)->argDiskdata + "' AS " + qpdb + ";"
         ).data(), NULL, NULL, &zErrMsg);
-        if (zErrMsg) FN::logWar("DB", string("Sqlite error: ") + zErrMsg);
+        if (zErrMsg) ((SH*)screen)->logWar("DB", string("Sqlite error: ") + zErrMsg);
         sqlite3_free(zErrMsg);
-        FN::logDB(((CF*)config)->argDiskdata);
+        ((SH*)screen)->logDB(((CF*)config)->argDiskdata);
       };
       void run() {
         if (((CF*)config)->argDatabase == ":memory:") return;
@@ -44,21 +44,20 @@ namespace K {
         sqlite3_exec(db, (
           string("SELECT json FROM ") + _table_(table) + " ORDER BY time ASC;"
         ).data(), cb, (void*)&j, &zErrMsg);
-        if (zErrMsg) FN::logWar("DB", string("Sqlite error: ") + zErrMsg);
+        if (zErrMsg) ((SH*)screen)->logWar("DB", string("Sqlite error: ") + zErrMsg);
         sqlite3_free(zErrMsg);
         return j;
       };
       void insert(mMatter table, json cell, bool rm = true, string updateId = "NULL", mClock rmOlder = 0) {
-        ((EV*)events)->deferred([this, table, cell, rm, updateId, rmOlder]() {
+        string sql = string((rm or updateId != "NULL" or rmOlder) ? string("DELETE FROM ") + _table_(table)
+          + (updateId != "NULL" ? string(" WHERE id = ") + updateId : (
+            rmOlder ? string(" WHERE time < ") + to_string(rmOlder) : ""
+          ) ) : "") + ";" + (cell.is_null() ? "" : string("INSERT INTO ") + _table_(table)
+            + " (id,json) VALUES(" + updateId + ",'" + cell.dump() + "');");
+        ((EV*)events)->deferred([this, sql]() {
           char* zErrMsg = 0;
-          sqlite3_exec(db, (
-            string((rm or updateId != "NULL" or rmOlder) ? string("DELETE FROM ") + _table_(table)
-            + (updateId != "NULL" ? string(" WHERE id = ") + updateId : (
-              rmOlder ? string(" WHERE time < ") + to_string(rmOlder) : ""
-            ) ) : "") + ";" + (cell.is_null() ? "" : string("INSERT INTO ") + _table_(table)
-              + " (id,json) VALUES(" + updateId + ",'" + cell.dump() + "');")
-          ).data(), NULL, NULL, &zErrMsg);
-          if (zErrMsg) FN::logWar("DB", string("Sqlite error: ") + zErrMsg);
+          sqlite3_exec(db, sql.data(), NULL, NULL, &zErrMsg);
+          if (zErrMsg) ((SH*)screen)->logWar("DB", string("Sqlite error: ") + zErrMsg);
           sqlite3_free(zErrMsg);
         });
       };

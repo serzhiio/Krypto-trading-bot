@@ -25,13 +25,14 @@ namespace K {
   enum class mAPR: unsigned int { Off, Size, SizeWidth };
   enum class mSOP: unsigned int { Off, Trades, Size, TradesSize };
   enum class mSTDEV: unsigned int { Off, OnFV, OnFVAPROff, OnTops, OnTopsAPROff, OnTop, OnTopAPROff };
+  enum class mHotkey: int { ESC = 27, Q = 81, q = 113 };
   enum class mPortal: unsigned char { Hello = '=', Kiss = '-' };
   enum class mMatter: unsigned char {
     FairValue            = 'a', Quote                = 'b', ActiveSubscription = 'c', Connectivity       = 'd', MarketData       = 'e',
     QuotingParameters    = 'f', SafetySettings       = 'g', Product            = 'h', OrderStatusReports = 'i',
     ProductAdvertisement = 'j', ApplicationState     = 'k', Notepad            = 'l', ToggleSettings     = 'm',
     Position             = 'n',                             SubmitNewOrder     = 'p', CancelOrder        = 'q', MarketTrade      = 'r',
-    Trades               = 's',ExternalValuation     = 't', QuoteStatus        = 'u', TargetBasePosition = 'v', TradeSafetyValue = 'w',
+    Trades               = 's', ExternalValuation    = 't', QuoteStatus        = 'u', TargetBasePosition = 'v', TradeSafetyValue = 'w',
     CancelAllOrders      = 'x', CleanAllClosedTrades = 'y', CleanAllTrades     = 'z', CleanTrade         = 'A',
     TradesChart          = 'B', WalletChart          = 'C', EWMAChart          = 'D', MarketDataLongTerm = 'G'
   };
@@ -493,7 +494,7 @@ namespace K {
     mLevel(mPrice p, mAmount s):
       price(p), size(s)
     {};
-    bool clear() {
+    void clear() {
       price = size = 0;
     };
     bool empty() {
@@ -581,21 +582,24 @@ namespace K {
               RBLUE[]  = "\033[0;34m", RPURPLE[] = "\033[0;35m", RCYAN[]  = "\033[0;36m", RWHITE[]  = "\033[0;37m",
               BBLACK[] = "\033[1;30m", BRED[]    = "\033[1;31m", BGREEN[] = "\033[1;32m", BYELLOW[] = "\033[1;33m",
               BBLUE[]  = "\033[1;34m", BPURPLE[] = "\033[1;35m", BCYAN[]  = "\033[1;36m", BWHITE[]  = "\033[1;37m";
-  static WINDOW *wBorder = nullptr,
-                *wLog    = nullptr;
   static ostringstream             THIS_WAS_A_TRIUMPH;
   static vector<function<void()>*> gwEndings;
+  static function<void()>* shResize;
+  static void *screen = nullptr;
   class Gw {
     public:
-      static Gw *config(mCoinId, mCoinId, string, int, string, string, string, string, string, string, int, int);
+      virtual string A() = 0;
+      void                    *screen  = nullptr;
+      uWS::Hub                *hub     = nullptr;
+      uWS::Group<uWS::CLIENT> *gwGroup = nullptr;
+      static Gw *config(mCoinId, mCoinId, string, int, string, string, string, string, string, string, int, int, void*);
+      function<void(string)>        reconnect;
       function<void(mOrder)>        evDataOrder;
       function<void(mTrade)>        evDataTrade;
       function<void(mWallet)>       evDataWallet;
       function<void(mLevels)>       evDataLevels;
       function<void(mConnectivity)> evConnectOrder,
                                     evConnectMarket;
-      uWS::Hub                *hub     = nullptr;
-      uWS::Group<uWS::CLIENT> *gwGroup = nullptr;
       mExchange exchange = (mExchange)0;
             int version  = 0, maxLevel = 0,
                 debug    = 0;
@@ -608,13 +612,52 @@ namespace K {
                 user     = "", pass    = "",
                 ws       = "", http    = "";
       mRandId (*randId)() = 0;
-      virtual   void wallet() = 0,
-                     levels() = 0,
-                     send(mRandId, mRandId, mRandId, mSide, string, string, mOrderType, mTimeInForce, bool, mClock) = 0,
-                     cancel(mRandId, mRandId, mSide, mClock) = 0,
-                     cancelAll() = 0,
-                     close() = 0;
-      virtual string A() = 0;
+      virtual void send(mRandId, mRandId, mRandId, mSide, string, string, mOrderType, mTimeInForce, bool, mClock) = 0,
+                   cancel(mRandId, mRandId, mSide, mClock) = 0,
+                   close() = 0;
+      inline bool waitForData() {
+        return waitFor(replyOrders, evDataOrder)
+             | waitFor(replyLevels, evDataLevels)
+             | waitFor(replyTrades, evDataTrade)
+             | waitFor(replyWallet, evDataWallet)
+             | waitFor(replyCancelAll, evDataOrder);
+      };
+      function<bool()> wallet = [&]() { return !(async_wallet() or !askFor(replyWallet, [&]() { return sync_wallet(); })); };
+      function<bool()> levels = [&]() { return askFor(replyLevels, [&]() { return sync_levels(); }); };
+      function<bool()> trades = [&]() { return askFor(replyTrades, [&]() { return sync_trades(); }); };
+      function<bool()> orders = [&]() { return askFor(replyOrders, [&]() { return sync_orders(); }); };
+      function<bool()> cancelAll = [&]() { return askFor(replyCancelAll, [&]() { return sync_cancelAll(); }); };
+      virtual bool async_levels() { return false; };
+      virtual bool async_trades() { return false; };
+      virtual bool async_orders() { return false; };
+      virtual vector<mOrder> sync_cancelAll() = 0;
+    protected:
+      virtual bool async_wallet() { return false; };
+      virtual vector<mWallet> sync_wallet() { return vector<mWallet>(); };
+      virtual vector<mLevels> sync_levels() { return vector<mLevels>(); };
+      virtual vector<mTrade> sync_trades() { return vector<mTrade>(); };
+      virtual vector<mOrder> sync_orders() { return vector<mOrder>(); };
+      future<vector<mWallet>> replyWallet;
+      future<vector<mLevels>> replyLevels;
+      future<vector<mTrade>> replyTrades;
+      future<vector<mOrder>> replyOrders;
+      future<vector<mOrder>> replyCancelAll;
+      template<typename mData, typename sync> inline bool askFor(future<vector<mData>> &reply, sync fn) {
+        bool waiting = reply.valid();
+        if (!waiting) {
+          reply = ::async(launch::async, fn);
+          waiting = true;
+        }
+        return waiting;
+      };
+      template<typename mData> inline unsigned int waitFor(future<vector<mData>> &reply, function<void(mData)> &fn) {
+        bool waiting = reply.valid();
+        if (waiting and reply.wait_for(chrono::nanoseconds(0))==future_status::ready) {
+          for (mData &it : reply.get()) fn(it);
+          waiting = false;
+        }
+        return waiting;
+      };
   };
   class Klass {
     protected:
@@ -630,8 +673,8 @@ namespace K {
                      *engine = nullptr;
       virtual void load(int argc, char** argv) {};
       virtual void load() {};
-      virtual void waitTime() {};
       virtual void waitData() {};
+      virtual void waitTime() {};
       virtual void waitUser() {};
       virtual void run() {};
     public:
@@ -641,8 +684,8 @@ namespace K {
       };
       void wait() {
         load();
-        waitTime();
         waitData();
+        waitTime();
         waitUser();
         run();
       };

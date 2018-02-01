@@ -23,12 +23,6 @@ namespace K {
         quotingMode[mQuotingMode::Depth]       = &calcDepthOfMarket;
         findMode("loaded");
       };
-      void waitTime() {
-        ((EV*)events)->tEngine->setData(this);
-        ((EV*)events)->tEngine->start([](Timer *tEngine) {
-          ((QE*)tEngine->getData())->timer_1s();
-        }, 1e+3, 1e+3);
-      };
       void waitData() {
         ((EV*)events)->uiQuotingParameters = [&]() {                _debugEvent_
           findMode("saved");
@@ -50,20 +44,21 @@ namespace K {
         debuq = [&](string k, mQuote &rawQuote) {};
         debug = [&](string k) {};
       };
-    private:
-      function<void(json*)> hello = [&](json *welcome) {
-        *welcome = { status };
-      };
+    public:
       inline void timer_1s() {                                      _debugEvent_
         if (((MG*)market)->fairValue) {
           ((MG*)market)->calcStats();
           ((PG*)wallet)->calcSafety();
           calcQuote();
-        } else FN::logWar("QE", "Unable to calculate quote, missing market data");
+        } else ((SH*)screen)->logWar("QE", "Unable to calculate quote, missing market data");
       };
-      inline void findMode(string event) {
+    private:
+      function<void(json*)> hello = [&](json *welcome) {
+        *welcome = { status };
+      };
+      inline void findMode(string reason) {
         if (quotingMode.find(qp->mode) == quotingMode.end())
-          exit(_errorEvent_("QE", string("Invalid quoting mode ") + event + ", consider to remove the database file"));
+          exit(_errorEvent_("QE", string("Invalid quoting mode ") + reason + ", consider to remove the database file"));
       }
       void calcQuote() {                                            _debugEvent_
         bidStatus = mQuoteState::MissingData;
@@ -113,7 +108,7 @@ namespace K {
         mClock now = _Tstamp_;
         for (map<mRandId, mOrder>::value_type &it : ((OG*)broker)->orders)
           if (it.second.orderStatus == mStatus::New) {
-            if (now-10e+3>it.second.time) zombies.push_back(it.second.orderId);
+            if (now-10e+3>it.second.time) zombies.push_back(it.first);
             (*qNew)++;
           } else if (it.second.orderStatus == mStatus::Working) {
             (mSide::Bid == it.second.side
@@ -152,7 +147,7 @@ namespace K {
         mQuote rawQuote = (*quotingMode[qp->mode])(widthPing, rawBidSz, rawAskSz);
         if (rawQuote.bid.price <= 0 or rawQuote.ask.price <= 0) {
           if (rawQuote.bid.price or rawQuote.ask.price)
-            FN::logWar("QP", "Negative price detected, widthPing must be smaller");
+            ((SH*)screen)->logWar("QP", "Negative price detected, widthPing must be smaller");
           return mQuote();
         }
         bool superTradesActive = false;
@@ -469,14 +464,14 @@ namespace K {
           cross = quote->ask.price <= quote->bid.price;
         }
         if (cross) {
-          FN::logWar("QE", "Cross quote detected");
+          ((SH*)screen)->logWar("QE", "Cross quote detected");
           return mQuoteState::Crossed;
         } else return mQuoteState::Live;
       };
       void updateQuote(mLevel q, mSide side, bool isPong) {
         unsigned int n = 0;
         vector<mRandId> toCancel,
-                          working;
+                        working;
         for (map<mRandId, mOrder>::value_type &it : ((OG*)broker)->orders)
           if (it.second.side != side) continue;
           else if (abs(it.second.price - q.price) < gw->minTick) return;
@@ -484,22 +479,24 @@ namespace K {
             if (qp->safety != mQuotingSafety::AK47 or ++n >= qp->bullets) return;
           } else if (qp->safety != mQuotingSafety::AK47 or (
             side == mSide::Bid ? q.price <= it.second.price : q.price >= it.second.price
-          )) toCancel.push_back(it.second.orderId);
-          else working.push_back(it.second.orderId);
+          )) toCancel.push_back(it.first);
+          else working.push_back(it.first);
         if (qp->safety == mQuotingSafety::AK47 and toCancel.empty() and !working.empty())
           toCancel.push_back(side == mSide::Bid ? working.front() : working.back());
         ((OG*)broker)->sendOrder(toCancel, side, q.price, q.size, mOrderType::Limit, mTimeInForce::GTC, isPong, true);
       };
       void stopAllQuotes(mSide side) {
+        vector<mRandId> toCancel;
         for (map<mRandId, mOrder>::value_type &it : ((OG*)broker)->orders)
           if (it.second.orderStatus == mStatus::Working and (side == mSide::Both or side == it.second.side))
-            ((OG*)broker)->cancelOrder(it.first);
+            toCancel.push_back(it.first);
+        for (mRandId &it : toCancel) ((OG*)broker)->cancelOrder(it);
       };
       function<void(string, mQuote&)> debuq = [&](string k, mQuote &rawQuote) {
         debug(string("quote") + k + " " + to_string((int)bidStatus) + " " + to_string((int)askStatus) + " " + ((json)rawQuote).dump());
       };
       function<void(string)> debug = [&](string k) {
-        FN::log("DEBUG", string("QE ") + k);
+        ((SH*)screen)->log("DEBUG", string("QE ") + k);
       };
   };
 }

@@ -10,7 +10,7 @@ namespace K {
       void load() {
         for (json &it : ((DB*)memory)->load(mMatter::Trades))
           tradesHistory.push_back(it);
-        FN::log("DB", string("loaded ") + to_string(tradesHistory.size()) + " historical Trades");
+        ((SH*)screen)->log("DB", string("loaded ") + to_string(tradesHistory.size()) + " historical Trades");
       };
       void waitData() {
         gw->evDataOrder = [&](mOrder k) {                           _debugEvent_
@@ -35,7 +35,7 @@ namespace K {
     public:
       void sendOrder(vector<mRandId> toCancel, mSide side, mPrice price, mAmount qty, mOrderType type, mTimeInForce tif, bool isPong, bool postOnly) {
         mRandId replaceOrderId,
-               replaceExchangeId;
+                replaceExchangeId;
         if (!toCancel.empty()) {
           replaceOrderId = side == mSide::Bid ? toCancel.back() : toCancel.front();
           toCancel.erase(toCancel.begin()+(side == mSide::Bid ? toCancel.size()-1 : 0));
@@ -186,7 +186,7 @@ namespace K {
           0, 0, 0, 0, 0, fee, false
         );
         ((EV*)events)->ogTrade(&trade);
-        FN::log(trade, gw->name);
+        ((SH*)screen)->log(trade, gw->name);
         if (qp->_matchPings) {
           mPrice widthPong = qp->widthPercentage
             ? qp->widthPongPercentage * trade.price / 100
@@ -267,7 +267,7 @@ namespace K {
           } else ++it;
       };
       function<void(string)> debug = [&](string k) {
-        FN::log("DEBUG", string("OG ") + k);
+        ((SH*)screen)->log("DEBUG", string("OG ") + k);
       };
   };
 }
